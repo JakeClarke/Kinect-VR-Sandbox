@@ -19,6 +19,7 @@ namespace KinectVRSandbox
         GraphicsDeviceManager graphics;
         SpriteBatch spriteBatch;
         KinectComponent kinectComponent;
+        SpriteFont font;
 
         public Game1()
         {
@@ -27,6 +28,7 @@ namespace KinectVRSandbox
 
             this.graphics.PreferredBackBufferHeight = 768;
             this.graphics.PreferredBackBufferWidth = 1280;
+            //this.graphics.IsFullScreen = true;
         }
 
         /// <summary>
@@ -37,11 +39,10 @@ namespace KinectVRSandbox
         /// </summary>
         protected override void Initialize()
         {
-            if (this.kinectComponent == null)
-	        {
-                this.kinectComponent = new KinectComponent(this);
-                this.Components.Add(this.kinectComponent);
-	        }
+            this.kinectComponent = new KinectComponent(this);
+            this.Components.Add(this.kinectComponent);
+                
+            this.Components.Add(new VRDisplay(this, this.kinectComponent));
 
             base.Initialize();
         }
@@ -54,8 +55,7 @@ namespace KinectVRSandbox
         {
             // Create a new SpriteBatch, which can be used to draw textures.
             spriteBatch = new SpriteBatch(GraphicsDevice);
-
-            // TODO: use this.Content to load your game content here
+            font = this.Content.Load<SpriteFont>("font");
         }
 
         /// <summary>
@@ -78,6 +78,17 @@ namespace KinectVRSandbox
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed)
                 this.Exit();
 
+            var kState = Keyboard.GetState();
+            if (kState.IsKeyDown(Keys.F))
+            {
+                this.graphics.IsFullScreen = !this.graphics.IsFullScreen;
+                this.graphics.ApplyChanges();
+            }
+            else if (kState.IsKeyDown(Keys.Escape))
+            {
+                this.Exit();
+            }
+
             // TODO: Add your update logic here
 
             base.Update(gameTime);
@@ -90,6 +101,7 @@ namespace KinectVRSandbox
         protected override void Draw(GameTime gameTime)
         {
             GraphicsDevice.Clear(Color.CornflowerBlue);
+            
             spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Opaque);
             if (this.kinectComponent.ColorTex != null)
             {
@@ -104,6 +116,20 @@ namespace KinectVRSandbox
                 spriteBatch.Draw(this.kinectComponent.PlayerMaskTex, new Vector2(this.kinectComponent.DepthTex.Width, 0), Color.White);
             }
             spriteBatch.End();
+
+            spriteBatch.Begin();
+            if(this.kinectComponent.SensorRunning)
+                spriteBatch.DrawString(this.font, "Head offset:" + this.kinectComponent.HeadOffset, new Vector2(0, this.GraphicsDevice.Viewport.Height - 40f), Color.White);
+            else
+                spriteBatch.DrawString(this.font, "No kinect enabled!", new Vector2(0, this.GraphicsDevice.Viewport.Height - 40f), Color.Red);
+            spriteBatch.End();
+
+            // reset the graphics device.
+            GraphicsDevice.BlendState = BlendState.Opaque;
+            GraphicsDevice.DepthStencilState = DepthStencilState.Default;
+            GraphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
+            GraphicsDevice.SamplerStates[0] = SamplerState.LinearWrap;
+
             base.Draw(gameTime);
         }
     }

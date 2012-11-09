@@ -9,6 +9,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework.Media;
 using Microsoft.Kinect;
+using System.Diagnostics;
 
 
 namespace KinectVRSandbox
@@ -19,7 +20,7 @@ namespace KinectVRSandbox
     public class KinectComponent : Microsoft.Xna.Framework.GameComponent
     {
         KinectSensor sensor;
-        Skeleton[] skeletons = new Skeleton[0];
+        Skeleton[] skeletons;
         Skeleton closestSkeleton;
 
         Boolean evaChangeRequested = false;
@@ -29,12 +30,15 @@ namespace KinectVRSandbox
         TimeSpan timeBetweenEvaChange = new TimeSpan(0, 0, 30), lastEvaChange = TimeSpan.FromSeconds(-28);
         TimeSpan prevSkelFrameTime;
 
-        Vector3 playerHeadRS;
+        Vector3 playerHeadStartingPos;
 
-        readonly Color[] PlayerColors = new Color[] {Color.White, Color.Red, Color.Blue, Color.Green, Color.Yellow, Color.Gray };
+        bool headPosSet;
+
+        readonly Color[] PlayerColors = new Color[] {Color.White, Color.Red, Color.Blue, Color.Green, Color.Yellow, Color.Gray, Color.MediumPurple};
 
         int tracked = 0;
         int targetEva;
+
 
         public KinectComponent(Game game)
             : base(game)
@@ -59,6 +63,7 @@ namespace KinectVRSandbox
 
             if (this.sensor != null)
             {
+                Debug.WriteLine("Opening sensor: " + this.sensor.UniqueKinectId);
                 this.sensor.Start();
                 this.sensor.ColorStream.Enable(ColorImageFormat.RgbResolution640x480Fps30);
                 this.sensor.DepthStream.Enable(DepthImageFormat.Resolution320x240Fps30);
@@ -87,86 +92,133 @@ namespace KinectVRSandbox
 
 
 
-                using (var frame = this.sensor.ColorStream.OpenNextFrame(0))
+                if (this.sensor.ColorStream.IsEnabled)
                 {
-                    if (frame != null)
+                    using (var frame = this.sensor.ColorStream.OpenNextFrame(0))
                     {
-                        this.colorTex = new Texture2D(this.Game.GraphicsDevice, frame.Width, frame.Height, false, SurfaceFormat.Color);
-
-                        byte[] data = new byte[frame.PixelDataLength];
-
-                        frame.CopyPixelDataTo(data);
-
-                        // convert bgr to rgb
-                        for (int i = 0; i < data.Length; i += 4)
+                        if (frame != null)
                         {
-                            byte temp = data[i];
-                            data[i] = data[i + 2];
-                            data[i + 2] = temp;
-                        }
 
-                        this.colorTex.SetData<byte>(data);
-                    }
-                }
+                            this.colorTex = new Texture2D(this.Game.GraphicsDevice, frame.Width, frame.Height, false, SurfaceFormat.Color); 
 
-                using (var frame = this.sensor.DepthStream.OpenNextFrame(0))
-                {
-                    if (frame != null)
-                    {
-                        this.depthTex = new Texture2D(this.Game.GraphicsDevice, frame.Width, frame.Height, false, SurfaceFormat.Bgra4444);
-                        this.playermaskTex = new Texture2D(this.Game.GraphicsDevice, frame.Width, frame.Height);
+                            byte[] data = new byte[frame.PixelDataLength];
 
-                        short[] pdata = new short[frame.PixelDataLength];
-                        Color[] pMask = new Color[frame.PixelDataLength];
+                            frame.CopyPixelDataTo(data);
 
-                        DepthImagePixel[] data = new DepthImagePixel[frame.PixelDataLength];
-                        frame.CopyDepthImagePixelDataTo(data);
-
-                        for (int i = 0; i < data.Length; i++)
-                        {
-                            pdata[i] = data[i].Depth;
-                            pMask[i] = PlayerColors[data[i].PlayerIndex];
-                        }
-                        this.depthTex.SetData<short>(pdata);
-                        this.playermaskTex.SetData<Color>(pMask);
-                    }
-                }
-
-                using (var frame = this.sensor.SkeletonStream.OpenNextFrame(0))
-                {
-                    if (frame != null)
-                    {
-                        this.skeletons = new Skeleton[frame.SkeletonArrayLength];
-
-                        frame.CopySkeletonDataTo(skeletons);
-                        Skeleton closest = null;
-
-                        this.tracked = 0;
-
-                        for (int i = 0; i < this.skeletons.Length; i++)
-                        {
-                            if (this.skeletons[i].TrackingState == SkeletonTrackingState.PositionOnly || this.skeletons[i].TrackingState == SkeletonTrackingState.Tracked)
+                            // convert bgr to rgb
+                            for (int i = 0; i < data.Length; i += 4)
                             {
-                                if (closest == null || closest.Position.Z > this.skeletons[i].Position.Z)
-                                {
-                                    closest = this.skeletons[i];
+                                byte temp = data[i];
+                                data[i] = data[i + 2];
+                                data[i + 2] = temp;
+                            }
 
+                            this.colorTex.SetData<byte>(data);
+                        }
+                    } 
+                }
+                else
+                {
+                    this.colorTex = null;
+                }
+
+                if (this.sensor.DepthStream.IsEnabled)
+                {
+                    using (var frame = this.sensor.DepthStream.OpenNextFrame(0))
+                    {
+                        if (frame != null)
+                        {
+
+                            this.depthTex = new Texture2D(this.Game.GraphicsDevice, frame.Width, frame.Height, false, SurfaceFormat.Bgra4444);
+                            this.playermaskTex = new Texture2D(this.Game.GraphicsDevice, frame.Width, frame.Height); 
+                            
+
+                            short[] pdata = new short[frame.PixelDataLength];
+                            Color[] pMask = new Color[frame.PixelDataLength];
+
+                            DepthImagePixel[] data = new DepthImagePixel[frame.PixelDataLength];
+                            frame.CopyDepthImagePixelDataTo(data);
+
+                            for (int i = 0; i < data.Length; i++)
+                            {
+                                pdata[i] = data[i].Depth;
+                                pMask[i] = PlayerColors[data[i].PlayerIndex];
+                            }
+                            this.depthTex.SetData<short>(pdata);
+                            this.playermaskTex.SetData<Color>(pMask);
+                        }
+                    }
+
+                }
+                else
+                {
+                    this.depthTex = null;
+                    this.playermaskTex = null;
+                }
+
+                if (this.sensor.SkeletonStream.IsEnabled)
+                {
+                    using (var frame = this.sensor.SkeletonStream.OpenNextFrame(0))
+                    {
+                        if (frame != null)
+                        {
+                            this.skeletons = new Skeleton[frame.SkeletonArrayLength];
+
+                            frame.CopySkeletonDataTo(skeletons);
+                            Skeleton closest = null;
+
+                            this.tracked = 0;
+
+                            for (int i = 0; i < this.skeletons.Length; i++)
+                            {
+                                if (this.skeletons[i].TrackingState == SkeletonTrackingState.PositionOnly || this.skeletons[i].TrackingState == SkeletonTrackingState.Tracked)
+                                {
+                                    if (closest == null || closest.Position.Z > this.skeletons[i].Position.Z)
+                                    {
+                                        closest = this.skeletons[i];
+
+                                    }
+
+                                    this.tracked++;
+                                }
+                            }
+                            if (closest != null)
+                            {
+                                if (this.closestSkeleton == null || this.closestSkeleton.TrackingId != closest.TrackingId)
+                                {
+                                    this.sensor.SkeletonStream.ChooseSkeletons(closest.TrackingId);
+                                    headPosSet = false;
+                                    Debug.WriteLine("New closest!");
                                 }
 
-                                this.tracked++;
+                                this.closestSkeleton = closest;
                             }
+
+                            if (!headPosSet && this.closestSkeleton != null && this.closestSkeleton.Joints[JointType.Head].TrackingState == JointTrackingState.Tracked)
+                            {
+                                this.headPosSet = true;
+                                this.playerHeadStartingPos = new Vector3(this.closestSkeleton.Joints[JointType.Head].Position.X, this.closestSkeleton.Joints[JointType.Head].Position.Y, this.closestSkeleton.Joints[JointType.Head].Position.Z);
+                                this.HeadOffset = Vector3.Zero;
+                                Debug.WriteLine("Set head pos!");
+                            }
+                            else if (this.headPosSet && this.closestSkeleton.Joints[JointType.Head].TrackingState == JointTrackingState.Tracked)
+                            {
+                                this.HeadOffset = (new Vector3(this.closestSkeleton.Joints[JointType.Head].Position.X, this.closestSkeleton.Joints[JointType.Head].Position.Y, this.closestSkeleton.Joints[JointType.Head].Position.Z)) - this.playerHeadStartingPos;
+                            }
+                            else
+                            {
+                                this.HeadOffset = Vector3.Zero;
+                            }
+
+
+                            this.prevSkelFrameTime = gameTime.TotalGameTime;
                         }
-
-                        if (closest != null && closest.TrackingState != SkeletonTrackingState.Tracked)
-                        {
-                            this.sensor.SkeletonStream.ChooseSkeletons(closest.TrackingId);
-                        }
-
-                        this.closestSkeleton = closest;
-
-
-                        this.prevSkelFrameTime = gameTime.TotalGameTime;
                     }
+                }
+                else
+                {
+                    this.skeletons = null;
+                    this.closestSkeleton = null;
                 }
 
                 if (kstate.IsKeyDown(Keys.D1))
@@ -230,7 +282,7 @@ namespace KinectVRSandbox
             get { return this.playermaskTex; }
         }
 
-        public Boolean SensorRunning { get { return this.sensor != null && this.sensor.IsRunning; } }
+        public bool SensorRunning { get { return this.sensor != null && this.sensor.IsRunning; } }
 
         public int TrackedPlayers
         {
@@ -250,6 +302,16 @@ namespace KinectVRSandbox
         public Skeleton[] Skeleton
         {
             get { return this.skeletons; }
+        }
+
+        public Vector3 HeadOffset { get; set; }
+
+        public bool HasSensor
+        {
+            get
+            {
+                return this.sensor != null;
+            }
         }
     }
 }
