@@ -52,6 +52,14 @@ namespace KinectVRSandbox
         /// </summary>
         public override void Initialize()
         {
+            initializeKinect();
+
+
+            base.Initialize();
+        }
+
+        private void initializeKinect()
+        {
             foreach (var sensor in KinectSensor.KinectSensors)
             {
                 if (sensor.Status == KinectStatus.Connected)
@@ -74,9 +82,6 @@ namespace KinectVRSandbox
 
                 this.targetEva = this.sensor.ElevationAngle;
             }
-
-
-            base.Initialize();
         }
 
         /// <summary>
@@ -99,7 +104,7 @@ namespace KinectVRSandbox
                         if (frame != null)
                         {
 
-                            this.colorTex = new Texture2D(this.Game.GraphicsDevice, frame.Width, frame.Height, false, SurfaceFormat.Color); 
+                            this.colorTex = new Texture2D(this.Game.GraphicsDevice, frame.Width, frame.Height, false, SurfaceFormat.Color);
 
                             byte[] data = new byte[frame.PixelDataLength];
 
@@ -115,7 +120,7 @@ namespace KinectVRSandbox
 
                             this.colorTex.SetData<byte>(data);
                         }
-                    } 
+                    }
                 }
                 else
                 {
@@ -130,8 +135,7 @@ namespace KinectVRSandbox
                         {
 
                             this.depthTex = new Texture2D(this.Game.GraphicsDevice, frame.Width, frame.Height, false, SurfaceFormat.Bgra4444);
-                            this.playermaskTex = new Texture2D(this.Game.GraphicsDevice, frame.Width, frame.Height); 
-                            
+                            this.playermaskTex = new Texture2D(this.Game.GraphicsDevice, frame.Width, frame.Height);
 
                             short[] pdata = new short[frame.PixelDataLength];
                             Color[] pMask = new Color[frame.PixelDataLength];
@@ -205,10 +209,6 @@ namespace KinectVRSandbox
                             {
                                 this.HeadOffset = (new Vector3(this.closestSkeleton.Joints[JointType.Head].Position.X, this.closestSkeleton.Joints[JointType.Head].Position.Y, this.closestSkeleton.Joints[JointType.Head].Position.Z)) - this.playerHeadStartingPos;
                             }
-                            else
-                            {
-                                this.HeadOffset = Vector3.Zero;
-                            }
 
 
                             this.prevSkelFrameTime = gameTime.TotalGameTime;
@@ -253,6 +253,11 @@ namespace KinectVRSandbox
 
                     }
                 }
+            }
+            else
+            {
+                // find a new kinect!
+                this.initializeKinect();
             }
 
 
