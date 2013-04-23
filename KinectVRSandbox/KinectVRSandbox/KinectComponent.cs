@@ -19,7 +19,7 @@ namespace KinectVRSandbox
     /// </summary>
     public class KinectComponent : Microsoft.Xna.Framework.GameComponent
     {
-        KinectSensor sensor;
+        static KinectSensor sensor; // static because we only want one hardware instance to be shared between instances of this class.
         Skeleton[] skeletons;
         Skeleton closestSkeleton;
 
@@ -43,7 +43,6 @@ namespace KinectVRSandbox
         public KinectComponent(Game game)
             : base(game)
         {
-            // TODO: Construct any child components here
         }
 
         /// <summary>
@@ -60,27 +59,34 @@ namespace KinectVRSandbox
 
         private void initializeKinect()
         {
-            foreach (var sensor in KinectSensor.KinectSensors)
+
+            if (sensor == null || !sensor.IsRunning)
             {
-                if (sensor.Status == KinectStatus.Connected)
+                sensor = null; // set so we can detect if no suitable sensor can be found.
+                foreach (var s in KinectSensor.KinectSensors)
                 {
-                    this.sensor = sensor;
-                    break;
+                    if (sensor.Status == KinectStatus.Connected)
+                    {
+                        sensor = s;
+
+                        Debug.WriteLine("Opening sensor: " + sensor.UniqueKinectId);
+                        sensor.Start();
+                        sensor.ColorStream.Enable(ColorImageFormat.RgbResolution640x480Fps30);
+                        sensor.DepthStream.Enable(DepthImageFormat.Resolution320x240Fps30);
+
+                        sensor.SkeletonStream.Enable();
+                        sensor.SkeletonStream.TrackingMode = SkeletonTrackingMode.Seated;
+                        sensor.SkeletonStream.AppChoosesSkeletons = true;
+
+                        this.targetEva = sensor.ElevationAngle;
+                        break;
+                    }
                 }
             }
 
-            if (this.sensor != null)
+            if (sensor == null)
             {
-                Debug.WriteLine("Opening sensor: " + this.sensor.UniqueKinectId);
-                this.sensor.Start();
-                this.sensor.ColorStream.Enable(ColorImageFormat.RgbResolution640x480Fps30);
-                this.sensor.DepthStream.Enable(DepthImageFormat.Resolution320x240Fps30);
-
-                this.sensor.SkeletonStream.Enable();
-                this.sensor.SkeletonStream.TrackingMode = SkeletonTrackingMode.Seated;
-                this.sensor.SkeletonStream.AppChoosesSkeletons = true;
-
-                this.targetEva = this.sensor.ElevationAngle;
+                Debug.WriteLine("No suitable sensor found.");
             }
         }
 
@@ -92,14 +98,14 @@ namespace KinectVRSandbox
         {
             KeyboardState kstate = Keyboard.GetState();
 
-            if (this.sensor != null)
+            if (sensor != null)
             {
 
 
 
-                if (this.sensor.ColorStream.IsEnabled)
+                if (sensor.ColorStream.IsEnabled)
                 {
-                    using (var frame = this.sensor.ColorStream.OpenNextFrame(0))
+                    using (var frame = sensor.ColorStream.OpenNextFrame(0))
                     {
                         if (frame != null)
                         {
@@ -127,9 +133,9 @@ namespace KinectVRSandbox
                     this.colorTex = null;
                 }
 
-                if (this.sensor.DepthStream.IsEnabled)
+                if (sensor.DepthStream.IsEnabled)
                 {
-                    using (var frame = this.sensor.DepthStream.OpenNextFrame(0))
+                    using (var frame = sensor.DepthStream.OpenNextFrame(0))
                     {
                         if (frame != null)
                         {
@@ -155,7 +161,7 @@ namespace KinectVRSandbox
                                 {
                                     if (item.TrackingState == JointTrackingState.Tracked)
                                     {
-                                        var pos = this.sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(item.Position, frame.Format);
+                                        var pos = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(item.Position, frame.Format);
                                         int aOffset = pos.X + (pos.Y * frame.Width);
                                         if (aOffset < pMask.Length)
                                         {
@@ -178,9 +184,9 @@ namespace KinectVRSandbox
                     this.playermaskTex = null;
                 }
 
-                if (this.sensor.SkeletonStream.IsEnabled)
+                if (sensor.SkeletonStream.IsEnabled)
                 {
-                    using (var frame = this.sensor.SkeletonStream.OpenNextFrame(0))
+                    using (var frame = sensor.SkeletonStream.OpenNextFrame(0))
                     {
                         if (frame != null)
                         {
@@ -212,7 +218,7 @@ namespace KinectVRSandbox
                             {
                                 if (this.closestSkeleton == null || this.closestSkeleton.TrackingId != closest.TrackingId)
                                 {
-                                    this.sensor.SkeletonStream.ChooseSkeletons(closest.TrackingId);
+                                    sensor.SkeletonStream.ChooseSkeletons(closest.TrackingId);
                                     headPosSet = false;
                                     Debug.WriteLine("New closest!");
                                 }
@@ -257,19 +263,19 @@ namespace KinectVRSandbox
                     evaChangeRequested = true;
                 }
 
-                if (evaChangeRequested && this.targetEva != this.sensor.ElevationAngle && this.lastEvaChange.Add(this.timeBetweenEvaChange) < gameTime.TotalGameTime)
+                if (evaChangeRequested && this.targetEva != sensor.ElevationAngle && this.lastEvaChange.Add(this.timeBetweenEvaChange) < gameTime.TotalGameTime)
                 {
                     this.lastEvaChange = gameTime.TotalGameTime;
                     evaChangeRequested = false;
 
-                    if (this.sensor.MaxElevationAngle < this.targetEva)
+                    if (sensor.MaxElevationAngle < this.targetEva)
                     {
-                        this.targetEva = this.sensor.MaxElevationAngle;
+                        this.targetEva = sensor.MaxElevationAngle;
                     }
 
                     try
                     {
-                        this.sensor.ElevationAngle = this.targetEva;
+                        sensor.ElevationAngle = this.targetEva;
                     }
                     catch
                     {
@@ -289,9 +295,9 @@ namespace KinectVRSandbox
 
         public void CloseDevice()
         {
-            if (this.SensorRunning)
+            if (sensor.IsRunning)
             {
-                this.sensor.Stop();
+                sensor.Stop();
             }
         }
 
@@ -310,7 +316,7 @@ namespace KinectVRSandbox
             get { return this.playermaskTex; }
         }
 
-        public bool SensorRunning { get { return this.sensor != null && this.sensor.IsRunning; } }
+        public bool SensorRunning { get { return sensor != null && sensor.IsRunning; } }
 
         public int TrackedPlayers
         {
@@ -340,7 +346,7 @@ namespace KinectVRSandbox
         {
             get
             {
-                return this.sensor != null;
+                return sensor != null;
             }
         }
     }
