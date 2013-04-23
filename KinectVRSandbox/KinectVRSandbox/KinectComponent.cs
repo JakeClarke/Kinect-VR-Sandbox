@@ -148,6 +148,24 @@ namespace KinectVRSandbox
                                 pdata[i] = data[i].Depth;
                                 pMask[i] = PlayerColors[data[i].PlayerIndex];
                             }
+
+                            if (this.closestSkeleton != null)
+                            {
+                                foreach (var item in this.closestSkeleton.Joints.ToArray())
+                                {
+                                    if (item.TrackingState == JointTrackingState.Tracked)
+                                    {
+                                        var pos = this.sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(item.Position, frame.Format);
+                                        int aOffset = pos.X + (pos.Y * frame.Width);
+                                        if (aOffset < pMask.Length)
+                                        {
+                                            pMask[aOffset] = Color.Black;
+                                        }
+                                        
+                                    }
+                                }
+                            }
+
                             this.depthTex.SetData<short>(pdata);
                             this.playermaskTex.SetData<Color>(pMask);
                         }
@@ -166,7 +184,11 @@ namespace KinectVRSandbox
                     {
                         if (frame != null)
                         {
-                            this.skeletons = new Skeleton[frame.SkeletonArrayLength];
+                            if (this.skeletons == null || this.skeletons.Length != frame.SkeletonArrayLength)
+                            {
+                                this.skeletons = new Skeleton[frame.SkeletonArrayLength];
+                            }
+                            
 
                             frame.CopySkeletonDataTo(skeletons);
                             Skeleton closest = null;
@@ -208,6 +230,7 @@ namespace KinectVRSandbox
                             else if (this.headPosSet && this.closestSkeleton.Joints[JointType.Head].TrackingState == JointTrackingState.Tracked)
                             {
                                 this.HeadOffset = (new Vector3(this.closestSkeleton.Joints[JointType.Head].Position.X, this.closestSkeleton.Joints[JointType.Head].Position.Y, this.closestSkeleton.Joints[JointType.Head].Position.Z)) - this.playerHeadStartingPos;
+                                this.HeadPosition = new Vector3(this.closestSkeleton.Joints[JointType.Head].Position.X, this.closestSkeleton.Joints[JointType.Head].Position.Y, this.closestSkeleton.Joints[JointType.Head].Position.Z);
                             }
 
 
@@ -304,12 +327,14 @@ namespace KinectVRSandbox
             get { return this.closestSkeleton; }
         }
 
-        public Skeleton[] Skeleton
+        public Skeleton[] Skeletons
         {
-            get { return this.skeletons; }
+            get { return this.skeletons.ToArray(); }
         }
 
         public Vector3 HeadOffset { get; set; }
+
+        public Vector3 HeadPosition { get; set; }
 
         public bool HasSensor
         {

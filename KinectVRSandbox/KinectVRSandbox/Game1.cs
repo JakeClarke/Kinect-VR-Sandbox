@@ -105,7 +105,8 @@ namespace KinectVRSandbox
             spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.Opaque);
             if (this.kinectComponent.ColorTex != null)
             {
-                spriteBatch.Draw(this.kinectComponent.ColorTex, this.GraphicsDevice.Viewport.Bounds, Color.White);
+                Rectangle pos = new Rectangle(this.GraphicsDevice.Viewport.Bounds.Right - 320, 0, 320, 240);
+                spriteBatch.Draw(this.kinectComponent.ColorTex, pos, Color.White);
             }
             if (this.kinectComponent.DepthTex != null)
             {
@@ -118,8 +119,22 @@ namespace KinectVRSandbox
             spriteBatch.End();
 
             spriteBatch.Begin();
-            if(this.kinectComponent.SensorRunning)
-                spriteBatch.DrawString(this.font, "Head offset:" + this.kinectComponent.HeadOffset, new Vector2(0, this.GraphicsDevice.Viewport.Height - 40f), Color.White);
+            if (this.kinectComponent.SensorRunning)
+            {
+                string debugPos = "Head offset: " + this.kinectComponent.HeadOffset + "\nHead pos: ";
+                if (this.kinectComponent.ClosestSkeleton != null)
+                {
+                    debugPos += this.kinectComponent.ClosestSkeleton.Joints[Microsoft.Kinect.JointType.Head].Position.X + ","
+                        + this.kinectComponent.ClosestSkeleton.Joints[Microsoft.Kinect.JointType.Head].Position.Y + "," 
+                        + this.kinectComponent.ClosestSkeleton.Joints[Microsoft.Kinect.JointType.Head].Position.Z;
+                }
+                else
+                {
+                    debugPos += "None valid";
+                }
+
+                spriteBatch.DrawString(this.font, debugPos, new Vector2(0, this.GraphicsDevice.Viewport.Height - 60f), Color.White);
+            }
             else
                 spriteBatch.DrawString(this.font, "No kinect enabled!", new Vector2(0, this.GraphicsDevice.Viewport.Height - 40f), Color.Red);
             spriteBatch.End();
