@@ -65,7 +65,7 @@ namespace KinectVRSandbox
                 sensor = null; // set so we can detect if no suitable sensor can be found.
                 foreach (var s in KinectSensor.KinectSensors)
                 {
-                    if (sensor.Status == KinectStatus.Connected)
+                    if (s.Status == KinectStatus.Connected)
                     {
                         sensor = s;
 
@@ -98,11 +98,8 @@ namespace KinectVRSandbox
         {
             KeyboardState kstate = Keyboard.GetState();
 
-            if (sensor != null)
+            if (sensor != null || !sensor.IsRunning)
             {
-
-
-
                 if (sensor.ColorStream.IsEnabled)
                 {
                     using (var frame = sensor.ColorStream.OpenNextFrame(0))
@@ -131,57 +128,6 @@ namespace KinectVRSandbox
                 else
                 {
                     this.colorTex = null;
-                }
-
-                if (sensor.DepthStream.IsEnabled)
-                {
-                    using (var frame = sensor.DepthStream.OpenNextFrame(0))
-                    {
-                        if (frame != null)
-                        {
-
-                            this.depthTex = new Texture2D(this.Game.GraphicsDevice, frame.Width, frame.Height, false, SurfaceFormat.Bgra4444);
-                            this.playermaskTex = new Texture2D(this.Game.GraphicsDevice, frame.Width, frame.Height);
-
-                            short[] pdata = new short[frame.PixelDataLength];
-                            Color[] pMask = new Color[frame.PixelDataLength];
-
-                            DepthImagePixel[] data = new DepthImagePixel[frame.PixelDataLength];
-                            frame.CopyDepthImagePixelDataTo(data);
-
-                            for (int i = 0; i < data.Length; i++)
-                            {
-                                pdata[i] = data[i].Depth;
-                                pMask[i] = PlayerColors[data[i].PlayerIndex];
-                            }
-
-                            if (this.closestSkeleton != null)
-                            {
-                                foreach (var item in this.closestSkeleton.Joints.ToArray())
-                                {
-                                    if (item.TrackingState == JointTrackingState.Tracked)
-                                    {
-                                        var pos = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(item.Position, frame.Format);
-                                        int aOffset = pos.X + (pos.Y * frame.Width);
-                                        if (aOffset < pMask.Length)
-                                        {
-                                            pMask[aOffset] = Color.Black;
-                                        }
-                                        
-                                    }
-                                }
-                            }
-
-                            this.depthTex.SetData<short>(pdata);
-                            this.playermaskTex.SetData<Color>(pMask);
-                        }
-                    }
-
-                }
-                else
-                {
-                    this.depthTex = null;
-                    this.playermaskTex = null;
                 }
 
                 if (sensor.SkeletonStream.IsEnabled)
@@ -248,6 +194,59 @@ namespace KinectVRSandbox
                 {
                     this.skeletons = null;
                     this.closestSkeleton = null;
+                }
+
+                if (sensor.DepthStream.IsEnabled)
+                {
+                    using (var frame = sensor.DepthStream.OpenNextFrame(0))
+                    {
+                        if (frame != null)
+                        {
+                            // we have a fraem we can use so create a texture asset, for the depth data.
+                            this.depthTex = new Texture2D(this.Game.GraphicsDevice, frame.Width, frame.Height, false, SurfaceFormat.Bgra4444);
+                            // ... and another for the player mask image.
+                            this.playermaskTex = new Texture2D(this.Game.GraphicsDevice, frame.Width, frame.Height);
+
+                            short[] pdata = new short[frame.PixelDataLength];
+                            Color[] pMask = new Color[frame.PixelDataLength];
+
+                            DepthImagePixel[] data = new DepthImagePixel[frame.PixelDataLength];
+                            frame.CopyDepthImagePixelDataTo(data);
+
+                            for (int i = 0; i < data.Length; i++)
+                            {
+                                pdata[i] = data[i].Depth;
+                                pMask[i] = PlayerColors[data[i].PlayerIndex];
+                            }
+
+                            if (this.closestSkeleton != null)
+                            {
+                                // draw dots on the player mask for each location of the joints.
+                                foreach (var item in this.closestSkeleton.Joints.ToArray())
+                                {
+                                    if (item.TrackingState == JointTrackingState.Tracked)
+                                    {
+                                        var pos = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(item.Position, frame.Format);
+                                        int aOffset = pos.X + (pos.Y * frame.Width);
+                                        if (aOffset < pMask.Length)
+                                        {
+                                            pMask[aOffset] = Color.Black;
+                                        }
+
+                                    }
+                                }
+                            }
+
+                            this.depthTex.SetData<short>(pdata);
+                            this.playermaskTex.SetData<Color>(pMask);
+                        }
+                    }
+
+                }
+                else
+                {
+                    this.depthTex = null;
+                    this.playermaskTex = null;
                 }
 
                 if (kstate.IsKeyDown(Keys.D1))
