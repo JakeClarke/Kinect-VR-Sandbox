@@ -23,7 +23,6 @@ namespace KinectVRSandbox
         Model model;
         const float HEAD_SCALER = 1f;
         const float FIELD_OF_VIEW = 80f;
-        float radiansPerPixel = 0f;
 
         const float NEAR_PLANE = 1f, FAR_PLANE = 100000f;
         
@@ -40,7 +39,6 @@ namespace KinectVRSandbox
         /// </summary>
         public override void Initialize()
         {
-            this.radiansPerPixel = (float)((Math.PI / 180d) * (double)FIELD_OF_VIEW) / this.Game.GraphicsDevice.Viewport.Width;
             base.Initialize();
         }
 
@@ -52,21 +50,10 @@ namespace KinectVRSandbox
         {
             if (this.kinect.ClosestSkeleton != null)
             {
-
-                //this.rsHeadoffset = new Vector3(-kinect.HeadOffset.X, kinect.HeadOffset.Y, -(kinect.HeadOffset.Z *0.5f)) * HEAD_SCALER;
                 this.rsHeadoffset = kinect.HeadPosition != Vector3.Zero ?new Vector3(-kinect.HeadPosition.X, kinect.HeadPosition.Y, -(kinect.HeadOffset.Z - 0.5f)) * HEAD_SCALER : Vector3.Zero;
-                //this.rsHeadoffset = new Vector3((float)Math.Sin(kinect.ClosestSkeleton.Joints[Microsoft.Kinect.JointType.Head].Position.X  * radiansPerPixel) * kinect.HeadOffset.Z, kinect.HeadOffset.Y, -kinect.HeadOffset.Z);
             }
-            //this.projection = Matrix.CreatePerspectiveFieldOfView(MathHelper.ToRadians(FIELD_OF_VIEW), this.Game.GraphicsDevice.Viewport.AspectRatio, NEAR_PLANE, FAR_PLANE);
-            
-            /*
-            this.projection = Matrix.CreatePerspectiveOffCenter(NEAR_PLANE * (-0.5f * this.Game.GraphicsDevice.Viewport.AspectRatio + kinect.HeadPosition.X) / kinect.HeadPosition.Z,
-                NEAR_PLANE * (0.5f * this.Game.GraphicsDevice.Viewport.AspectRatio + kinect.HeadPosition.X) / kinect.HeadPosition.Z,
-                NEAR_PLANE * (-.5f - kinect.HeadPosition.Y) / kinect.HeadPosition.Z,
-                NEAR_PLANE * (.5f - kinect.HeadPosition.Y) / kinect.HeadPosition.Z, NEAR_PLANE, FAR_PLANE);
-             * 
-             */
 
+            // build the projection matrix.
             this.projection = Matrix.CreatePerspectiveOffCenter(NEAR_PLANE * (-0.5f * this.Game.GraphicsDevice.Viewport.AspectRatio + this.rsHeadoffset.X) / this.rsHeadoffset.Z,
                 NEAR_PLANE * (0.5f * this.Game.GraphicsDevice.Viewport.AspectRatio + this.rsHeadoffset.X) / this.rsHeadoffset.Z,
                 NEAR_PLANE * (-.5f - this.rsHeadoffset.Y) / this.rsHeadoffset.Z,
